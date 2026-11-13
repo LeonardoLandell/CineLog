@@ -1,0 +1,30 @@
+# Dependências
+node_modules/
+.pnp/
+.pnp.js
+
+# Build de Produção e Vite
+dist/
+.vite/
+
+# Variáveis de Ambiente (Protege tokens do Turso e TMDB)
+.env
+.env.local
+.env.*.local
+
+# Estado local da Vercel CLI
+.vercel/
+
+# Logs e arquivos de sistema
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+.DS_Store
+Thumbs.db
+
+# Editores de Código
+.vscode/*
+!.vscode/settings.json
+.idea/

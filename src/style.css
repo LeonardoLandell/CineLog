@@ -1,0 +1,58 @@
+:root {
+  /* --- PALETA DAY MODE (60% Chalk, 30% Onyx, 10% Mint) --- */
+  --bg-primary: #F2F1EE;       /* 60% Chalk White */
+  --bg-secondary: #E4E3DF;     /* Superfícies secundárias claras */
+  --bg-card: #FFFFFF;          /* Cards limpos */
+  --bg-glass: rgba(242, 241, 238, 0.85);
+  
+  --text-primary: #121214;     /* 30% Onyx Black */
+  --text-secondary: #52525b;   /* Cinza legível para metadados */
+  --text-muted: #71717a;       
+  
+  --accent-primary: #22E3A2;   /* 10% Mint Rush (Destaques e botões) */
+  --accent-hover: #1ac78f;
+  --accent-anime: #22E3A2;
+  --accent-gold: #D97706;      /* Dourado adaptado para o claro */
+  
+  --border-color: rgba(18, 18, 20, 0.1);
+  --radius-sm: 6px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  
+  --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+  --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+[data-theme="dark"] {
+  /* --- PALETA DARK / BLACK MODE (60% Onyx, 30% Chalk, 10% Electric Violet) --- */
+  --bg-primary: #121214;       /* 60% Onyx Black */
+  --bg-secondary: #18181b;     /* Superfícies secundárias escuras */
+  --bg-card: #1f1f23;          /* Cards em tom profundo */
+  --bg-glass: rgba(18, 18, 20, 0.85);
+  
+  --text-primary: #F2F1EE;     /* 30% Chalk White */
+  --text-secondary: #a1a1aa;   /* Cinza claro para metadados */
+  --text-muted: #71717a;
+  
+  --accent-primary: #7B4DFF;   /* 10% Electric Violet (Destaques e botões) */
+  --accent-hover: #683ee0;
+  --accent-anime: #7B4DFF;
+  --accent-gold: #FBBF24;      /* Dourado cinematográfico */
+  
+  --border-color: rgba(255, 255, 255, 0.08);
+}
+
+body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+  transition: background-color var(--transition), color var(--transition);
+}
+
+/* Ajuste específico para o botão de Mint Rush no modo Day para garantir contraste do texto */
+[data-theme="day"] .btn-watchlist:hover,
+:root:not([data-theme="dark"]) .btn-watchlist:hover {
+  color: #121214;
+  font-weight: 700;
+}
