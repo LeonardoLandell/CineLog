@@ -1,8 +1,18 @@
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  // Configurações básicas do Vite para SPA
-  server: {
-    port: 3000,
-  },
+  build: {
+    target: 'esnext',
+    minify: 'esbuild',
+    cssCodeSplit: true,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            return 'vendor';
+          }
+        }
+      }
+    }
+  }
 });

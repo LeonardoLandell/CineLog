@@ -1,165 +1,131 @@
 import './style.css';
-import { router } from './router';
-import { WatchlistClient } from './services/watchlistClient';
-import { MediaService } from './services/mediaService';
-import { renderHome } from './views/homeView';
-import { renderWatchlist } from './views/watchlistView';
-import { createMediaCard } from './components/card';
-import { renderHeader } from './components/header';
-import { MediaItem, WatchlistEntry, MediaStatus } from './types';
+import { store } from './core/store';
+import { tmdbService } from './services/tmdbService';
+import { createNavbar } from './components/navbar';
+import { createCarouselRow } from './components/carouselRow';
+import { createMediaCard } from './components/mediaCard';
+import { initMediaModal } from './components/mediaModal';
+import { createFooter } from './components/footer';
 
-const headerContainer = document.getElementById('header-container') as HTMLElement;
-const appEl = document.getElementById('app') as HTMLElement;
-
-let watchlistCache: WatchlistEntry[] = [];
-let watchlistUids = new Set<string>();
-
-// --- GERENCIAMENTO DE TEMA ---
-function initTheme() {
-  const savedTheme = localStorage.getItem('cinelog_theme') || 'dark';
-  document.documentElement.setAttribute('data-theme', savedTheme);
+// 1. Sincroniza o tema inicial e as alterações no HTML raiz
+function applyThemeToRoot(theme: string) {
+  document.documentElement.setAttribute('data-theme', theme);
 }
 
-function toggleTheme() {
-  const current = document.documentElement.getAttribute('data-theme');
-  const next = current === 'dark' ? 'day' : 'dark';
-  document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('cinelog_theme', next);
-}
+applyThemeToRoot(store.getState().theme);
 
-async function updateHeader() {
-  headerContainer.innerHTML = renderHeader(watchlistCache.length);
-  
-  // Event listener para o botão de tema
-  const themeBtn = document.getElementById('theme-toggle-btn');
-  if (themeBtn) {
-    themeBtn.onclick = toggleTheme;
-  }
-
-  // Reatribuir listener de busca após renderizar o header
-  setupSearchListener();
-}
-
-async function syncWatchlistState() {
-  try {
-    watchlistCache = await WatchlistClient.getAll();
-    watchlistUids = new Set(watchlistCache.map(i => i.uid));
-    await updateHeader();
-  } catch (err) {
-    console.error('Erro ao sincronizar watchlist:', err);
-  }
-}
-
-// Configuração das rotas
-router.add('/', async () => {
-  await syncWatchlistState();
-  renderHome(appEl, watchlistUids, handleToggleWatchlist);
+store.on('theme:changed', (newTheme: string) => {
+  applyThemeToRoot(newTheme);
 });
 
-router.add('/watchlist', async () => {
-  await syncWatchlistState();
-  renderWatchlist(
-    appEl, 
-    watchlistCache, 
-    handleUpdateStatus, 
-    handleUpdateRating, 
-    handleRemoveFromWatchlist
-  );
-});
+const app = document.querySelector<HTMLDivElement>('#app');
 
-async function handleToggleWatchlist(item: MediaItem) {
-  try {
-    if (watchlistUids.has(item.uid)) {
-      await WatchlistClient.remove(item.uid);
-    } else {
-      await WatchlistClient.add(item.uid);
+if (app) {
+  const mainContainer = document.createElement('main');
+  mainContainer.style.cssText = 'padding: 1.5rem 3vw; max-width: 1680px; margin: 0 auto;';
+
+  async function loadUnifiedHome() {
+    mainContainer.innerHTML = `
+      <p style="color: var(--text-secondary); text-align: center; padding: 4rem 0;">
+        Carregando catálogos...
+      </p>
+    `;
+
+    try {
+      const [
+        moviesLatest,
+        moviesPopular,
+        seriesPopular,
+        animesLatest,
+        animesPopular,
+      ] = await Promise.all([
+        tmdbService.getLatest('movie'),
+        tmdbService.getPopular('movie'),
+        tmdbService.getPopular('tv'),
+        tmdbService.getLatest('anime'),
+        tmdbService.getPopular('anime'),
+      ]);
+
+      mainContainer.innerHTML = '';
+
+      const moviesSec = document.createElement('div');
+      moviesSec.id = 'sec-filmes';
+      moviesSec.appendChild(createCarouselRow('Filmes em Cartaz & Lançamentos', moviesLatest));
+      moviesSec.appendChild(createCarouselRow('Filmes Populares', moviesPopular));
+      mainContainer.appendChild(moviesSec);
+
+      const seriesSec = document.createElement('div');
+      seriesSec.id = 'sec-series';
+      seriesSec.appendChild(createCarouselRow('Séries em Alta', seriesPopular));
+      mainContainer.appendChild(seriesSec);
+
+      const animesSec = document.createElement('div');
+      seriesSec.id = 'sec-animes';
+      animesSec.appendChild(createCarouselRow('Animes Recentes', animesLatest));
+      animesSec.appendChild(createCarouselRow('Animes Populares', animesPopular));
+      mainContainer.appendChild(animesSec);
+
+    } catch (error) {
+      console.error('Erro ao carregar o feed:', error);
+      mainContainer.innerHTML = `
+        <p style="color: #ef4444; text-align: center; padding: 3rem;">
+          Erro ao conectar com o TMDB. Verifique sua chave no arquivo .env.
+        </p>
+      `;
     }
-    await syncWatchlistState();
-    router.handleRoute();
-  } catch (err) {
-    alert('Erro ao atualizar watchlist no servidor.');
   }
-}
 
-async function handleUpdateStatus(uid: string, status: MediaStatus) {
-  try {
-    await WatchlistClient.update(uid, { status });
-    await syncWatchlistState();
-  } catch {
-    alert('Erro ao atualizar status.');
-  }
-}
+  async function handleSearch(query: string) {
+    if (!query) {
+      loadUnifiedHome();
+      return;
+    }
 
-async function handleUpdateRating(uid: string, rating: number | null) {
-  if (rating !== null && (rating < 1 || rating > 10)) {
-    alert('A nota pessoal deve estar entre 1 e 10.');
-    return;
-  }
-  try {
-    await WatchlistClient.update(uid, { personal_rating: rating });
-    await syncWatchlistState();
-  } catch {
-    alert('Erro ao salvar avaliação.');
-  }
-}
+    mainContainer.innerHTML = `
+      <p style="color: var(--text-secondary); padding: 2rem 0;">
+        Buscando por "${query}"...
+      </p>
+    `;
 
-async function handleRemoveFromWatchlist(uid: string) {
-  try {
-    await WatchlistClient.remove(uid);
-    await syncWatchlistState();
-    router.handleRoute();
-  } catch {
-    alert('Erro ao remover item.');
-  }
-}
+    try {
+      const results = await tmdbService.search(query);
+      mainContainer.innerHTML = `
+        <h2 style="font-size: 1.15rem; font-weight: 700; margin-bottom: 1.5rem; color: var(--text-primary);">
+          Resultados para "${query}" (${results.length})
+        </h2>
+        <div id="search-grid" class="search-results-grid"></div>
+      `;
 
-// Delegação de cliques para os botões de Watchlist nos cards
-appEl.addEventListener('click', (e) => {
-  const btn = (e.target as HTMLElement).closest('[data-action="toggle-watchlist"]');
-  if (!btn) return;
-  const itemJson = (btn as HTMLElement).dataset.item;
-  if (itemJson) {
-    const item: MediaItem = JSON.parse(itemJson);
-    handleToggleWatchlist(item);
-  }
-});
-
-// Pesquisa dinâmica com debounce
-function setupSearchListener() {
-  const searchInput = document.getElementById('search-input') as HTMLInputElement;
-  if (!searchInput) return;
-
-  let searchTimeout: any;
-  searchInput.addEventListener('input', (e) => {
-    clearTimeout(searchTimeout);
-    const q = (e.target as HTMLInputElement).value.trim();
-
-    searchTimeout = setTimeout(async () => {
-      if (!q) {
-        router.navigateTo('/');
-        return;
-      }
-
-      appEl.innerHTML = `<h2 class="section-title" style="margin-bottom:1.25rem">Buscando por "${q}"...</h2>`;
-      try {
-        const results = await MediaService.searchAll(q);
+      const grid = mainContainer.querySelector('#search-grid');
+      if (grid) {
         if (results.length === 0) {
-          appEl.innerHTML = `<div class="feedback-box">Nenhum resultado encontrado para "${q}".</div>`;
-          return;
+          grid.innerHTML = `<p style="color: var(--text-secondary);">Nenhum título encontrado.</p>`;
+        } else {
+          results.forEach((item) => grid.appendChild(createMediaCard(item)));
         }
-        appEl.innerHTML = `
-          <h2 class="section-title" style="margin-bottom:1.25rem">Resultados para "${q}"</h2>
-          <div class="media-grid">${results.map(item => createMediaCard(item, watchlistUids.has(item.uid))).join('')}</div>
-        `;
-      } catch {
-        appEl.innerHTML = `<div class="feedback-box">Erro ao realizar pesquisa.</div>`;
       }
-    }, 400);
-  });
-}
+    } catch (err) {
+      console.error('Erro na busca:', err);
+    }
+  }
 
-// Inicialização
-initTheme();
-syncWatchlistState().then(() => {
-  router.init();
-});
+  // 2. Monta a Navbar com os estados de Auth e injeta no app
+  const navbar = createNavbar({
+    onSearch: handleSearch,
+    onProfileClick: () => {
+      alert('Drawer de Perfil & Watchlist do usuário logado será conectado no próximo passo!');
+    },
+    onAuthStateChange: () => {
+      loadUnifiedHome();
+    },
+  });
+
+  app.innerHTML = '';
+  app.appendChild(navbar);
+  app.appendChild(mainContainer);
+  app.appendChild(createFooter()); // <-- Corrigido para executar a função e retornar o HTMLElement
+
+  document.body.appendChild(initMediaModal());
+
+  loadUnifiedHome();
+}
